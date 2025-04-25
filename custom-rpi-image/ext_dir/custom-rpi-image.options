@@ -1,0 +1,14 @@
+DEVICE_HOSTNAME=
+APP_IMAGE_NAME=
+device_user1=
+device_user1pass=""
+device_ssh_user1=y
+domain=""
+dynu_user=""
+dynu_password=""
+mysql_root_password=""
+mysql_database=
+mysql_user=
+mysql_password=""
+wifi_ssid=""
+wifi_pw=""

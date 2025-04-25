@@ -1,0 +1,16 @@
+[Unit]
+Description=Renew Certbot certificates
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /home/<DEVICE_USER>/manage-cert.sh
+StandardOutput=append:/home/<DEVICE_USER>/nginx-ssl/certbot-renew.log
+StandardError=append:/home/<DEVICE_USER>/nginx-ssl/certbot-renew.log
+User=<DEVICE_USER>
+Group=<DEVICE_USER>
+WorkingDirectory=/home/<DEVICE_USER>
+
+[Install]
+WantedBy=multi-user.target

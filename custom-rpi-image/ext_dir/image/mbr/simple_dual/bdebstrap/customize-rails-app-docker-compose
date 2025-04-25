@@ -1,0 +1,39 @@
+#!/bin/sh
+
+set -eu
+
+# create directores for nginx and certbot
+#
+chroot $1 runuser -u $IGconf_device_user1 -- bash -c "mkdir -p ~/nginx-ssl/{nginx,public,certbot/{conf,data}}"
+chroot $1 runuser -u $IGconf_device_user1 -- bash -c "mkdir -p ~/nginx-ssl/certbot/conf/live/$IGconf_domain"
+
+rsync -a ../rails-app-docker-compose-setup/ $1/home/$IGconf_device_user1/
+sed -i "s/<DOMAIN>/$IGconf_domain/" $1/home/$IGconf_device_user1/manage-cert.sh
+chroot $1 chown -R $IGconf_device_user1:$IGconf_device_user1 /home/$IGconf_device_user1
+
+chroot $1 runuser -u $IGconf_device_user1 -- bash -c "find ~/ -type f -name \"*.sh\" | xargs chmod 755"
+
+sed -i \
+  -e "s/<DOMAIN>/$IGconf_domain/g" \
+  -e "s/<APP_IMAGE_NAME>/$IGconf_app_image_name/g" \
+  -e "s/<MYSQL_ROOT_PASSWORD>/$IGconf_mysql_root_password/g" \
+  -e "s/<MYSQL_DATABASE>/$IGconf_mysql_database/g" \
+  -e "s/<MYSQL_USER>/$IGconf_mysql_user/g" \
+  -e "s/<MYSQL_PASSWORD>/$IGconf_mysql_password/g" \
+  $1/home/$IGconf_device_user1/docker-compose.prod.yml
+
+# set certbot directory permissions to root
+#
+chroot $1 chown -R root:root /home/$IGconf_device_user1/nginx-ssl/certbot/conf
+chroot $1 chmod -R 755 /home/$IGconf_device_user1/nginx-ssl/certbot/conf
+chroot $1 chmod -R 755 /home/$IGconf_device_user1/nginx-ssl/certbot/data
+
+# setup service to check for and renew the cert
+#
+rsync -a ../renew-cert-setup/ $1/etc/systemd/system/
+
+sed -i \
+  -e "s/<DEVICE_USER>/$IGconf_device_user1/g" \
+  $1/etc/systemd/system/renew-cert.service
+
+$BDEBSTRAP_HOOKS/enable-units "$1" renew-cert.timer

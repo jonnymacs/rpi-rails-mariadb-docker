@@ -1,0 +1,14 @@
+#!/bin/sh
+
+set -eu
+
+cat ../ddclient/ddclient.conf.tpl | sed \
+   -e "s/<DOMAIN>/$IGconf_domain/g" \
+   -e "s|<DYNU_USER>|$IGconf_dynu_user|g" \
+   -e "s|<DYNU_PASSWORD>|$IGconf_dynu_password|g" \
+   > $1/etc/ddclient.conf
+
+# enable avahi to broadcast the hostname
+# on the local network
+#
+$BDEBSTRAP_HOOKS/enable-units "$1" ddclient

@@ -1,0 +1,110 @@
+services:
+  nginx-init:
+    profiles:
+      - init  # Only runs when explicitly referenced or profile is included
+    image: nginx:latest
+    container_name: nginx-init
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx-ssl/init:/etc/nginx/conf.d
+      - ./nginx-ssl/public:/var/www/html
+      - ./nginx-ssl/certbot/data:/var/www/certbot
+    networks:
+      - app-network
+  certbot-init:
+    profiles:
+      - init  # Only runs when explicitly referenced or profile is included
+    image: certbot/certbot:latest
+    container_name: certbot-init
+    volumes:
+      - ./nginx-ssl/certbot/conf:/etc/letsencrypt
+      - ./nginx-ssl/certbot/data:/var/www/certbot
+    depends_on:
+      - nginx-init
+    command: >
+      certonly --webroot --webroot-path=/var/www/certbot
+      --email macmindio@gmail.com --agree-tos --no-eff-email
+      --cert-name <DOMAIN>
+      -d <DOMAIN> -d www.<DOMAIN>
+    networks:
+      - app-network
+  nginx:
+    profiles:
+      - app
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-ssl/nginx:/etc/nginx/conf.d
+      - ./nginx-ssl/public:/var/www/html
+      - ./nginx-ssl/certbot/conf:/etc/letsencrypt
+      - ./nginx-ssl/certbot/data:/var/www/certbot
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - app-network
+  mariadb:
+    profiles:
+      - app
+    image: mariadb:11.7.2
+    ports:
+      - '3306:3306'
+    environment:
+      - MYSQL_ROOT_PASSWORD=<MYSQL_ROOT_PASSWORD>
+      - MYSQL_DATABASE=<MYSQL_DATABASE>
+      - MYSQL_USER=<MYSQL_USER>
+      - MYSQL_PASSWORD=<MYSQL_PASSWORD>
+    networks:
+      - app-network
+    volumes:
+      - ./mariadb-data:/var/lib/mysql
+    restart: unless-stopped
+  app:
+    profiles:
+      - app
+    image: <APP_IMAGE_NAME>-app:latest
+    # sources environment variable configuration for our app
+    command: /bin/sh -c "rm -f /app/tmp/pids/server.pid && ./bin/prod"
+    # rely on the RAILS_ENV value of the host machine
+    container_name: <APP_IMAGE_NAME>-app
+    environment:
+      - RAILS_ENV=production
+      - RACK_ENV=production
+    volumes:
+      - ./<APP_IMAGE_NAME>-data:/app/data
+    # makes the app container aware of the DB container
+    depends_on:
+      - mariadb
+    networks:
+      - app-network
+    # expose the port we configured Unicorn to bind to
+    expose:
+      - "3000"
+    restart: unless-stopped
+  certbot:
+    profiles:
+      - app
+    image: certbot/certbot:latest
+    container_name: certbot
+    volumes:
+      - ./nginx-ssl/certbot/conf:/etc/letsencrypt
+      - ./nginx-ssl/certbot/data:/var/www/certbot
+    depends_on:
+      - nginx
+    command: >
+      renew --webroot --webroot-path=/var/www/certbot
+    networks:
+      - app-network
+      
+networks:
+  app-network:
+    name: app-network  # Explicit name to avoid project prefix
+    driver: bridge
+
+volumes:
+  leagueheads-data:
+  mariadb-data:
